@@ -1,0 +1,35 @@
+name: Docker CI/CD Pipeline
+on:
+    push:
+        branches:
+          - main
+jobs:
+    build-and-deploy:
+      runs-on: self-hosted
+      steps:
+      - name: checkout code
+        uses: actions/checkout@v2
+      
+      - name: login into docker 
+        uses: docker/login-action@v1  
+        with:
+            username : ${{secrets.DOCKER_USER_NAME}} 
+            password : ${{secrets.DOCKER_USER_PASSWORD}}
+            
+      - name: Build and Push into docker image
+        uses: docker/build-push-action@v2
+        with:
+            context: .
+            push: true
+            tags: kunalprajapat854/docker-app:${{ github.sha }}
+      - name: Deploy Into EC2-Instance
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{secrets.EC2_HOST}}
+          username: ${{secrets.EC2_HOST_USERNAME}}
+          key: ${{secrets.EC2_HOST_KEY}}
+          script: |
+            docker stop docker-app || true
+            docker rm docker-app || true
+            docker pull ${{secrets.DOCKER_USER_NAME}}/docker-app:${{ github.sha }}
+            docker run -d --name docker-app  -p 80:80 ${{secrets.DOCKER_USER_NAME}}/docker-app:${{github.sha}}
